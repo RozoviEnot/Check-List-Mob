@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чек-лист приёмки поверхностей</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            margin: 10px;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        .controls {
+            margin: 10px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        button, input, select {
+            padding: 8px 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #f0f0f0;
+            min-width: 120px;
+        }
+        #objectName {
+            flex: 1;
+            min-width: 150px;
+        }
+        #savedLists {
+            flex: 1;
+            min-width: 180px;
+        }
+        .checklist-item {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        .item-header {
+            background-color: #f5f5f5;
+            padding: 8px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .item-number {
+            background: #333;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+        .item-content {
+            padding: 10px;
+        }
+        .form-group {
+            margin-bottom: 10px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 12px;
+            color: #555;
+        }
+        select, input[type="text"], input[type="number"], textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+        .small-input {
+            width: 60px;
+        }
+        .defect-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin: 5px 0;
+        }
+        .defect-tag {
+            background: #ffecec;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+        }
+        .defect-tag::after {
+            content: "×";
+            margin-left: 5px;
+            cursor: pointer;
+        }
+        .material-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+        .material-row input {
+            flex: 1;
+        }
+        .toggle-section {
+            background: #f0f0f0;
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .collapsible {
+            display: none;
+        }
+        .collapsible.active {
+            display: block;
+        }
+        @media (min-width: 768px) {
+            body {
+                margin: 20px;
+                font-size: 16px;
+            }
+            .checklist-item {
+                max-width: 800px;
+                margin: 0 auto 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Чек-лист приёмки поверхностей</h1>
+    
+    <div class="controls">
+        <input type="text" id="objectName" placeholder="Название объекта">
+        <button onclick="addItem()">+ Добавить</button>
+        <button onclick="saveChecklist()">💾 Сохранить</button>
+        <button onclick="loadChecklist()">📂 Загрузить</button>
+        <select id="savedLists" onchange="loadSelected()">
+            <option value="">-- Выберите --</option>
+        </select>
+    </div>
+
+    <div id="checklistContainer">
+        <!-- Элементы будут добавляться здесь -->
+    </div>
+
+    <script>
+        // Данные для выпадающих списков
+        const ROOM_TYPES = ["Спальня", "Гостиная", "Кухня", "Ванная", "Коридор", "Офис"];
+        const PLANE_TYPES = ["Стена", "Потолок", "Пол", "Откос", "Дверь", "Колонна", "Арка"];
+        const BASE_MATERIALS = ["ГКЛ", "ГВЛ", "Фанера", "ОСБ", "Цементная стяжка", "Кирпич", "Бетон"];
+        const DECORATIVE_TYPES = [
+            "Микроцемент", "Имола", "Замша", "Шелк", 
+            "Структурато", "Покраска", "2-слойка известь", 
+            "2-слойка акрил", "Кварцмат", "Травертин", "Скала"
+        ];
+        const DEFECTS = ["Царапины", "Сколы", "Рыхлость", "Наплывы", "Неошкурено", "Отслоения", "Пятна"];
+
+        let itemCount = 0;
+
+        // Добавление нового элемента
+        function addItem(itemData = null) {
+            itemCount++;
+            const container = document.getElementById('checklistContainer');
+            
+            const item = document.createElement('div');
+            item.className = 'checklist-item';
+            item.dataset.id = itemCount;
+            
+            item.innerHTML = `
+                <div class="item-header">
+                    <span>Поверхность #${itemCount}</span>
+                    <span class="item-number">${itemCount}</span>
+                </div>
+                <div class="item-content">
+                    <div class="form-group">
+                        <label>Помещение</label>
+                        <select class="room-type">
+                            <option value="">Выберите помещение</option>
+                            ${ROOM_TYPES.map(t => `
+                                <option value="${t}" ${itemData?.roomType === t ? 'selected' : ''}>${t}</option>
+                            `).join('')}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Тип плоскости</label>
+                        <div style="display:flex;gap:8px">
+                            <select class="plane-type" style="flex:1">
+                                <option value="">Выберите тип</option>
+                                ${PLANE_TYPES.map(t => `
+                                    <option value="${t}" ${itemData?.planeType === t ? 'selected' : ''}>${t}</option>
+                                `).join('')}
+                            </select>
+                            <input type="number" class="small-input" min="1" value="${itemData?.planeCount || 1}" placeholder="Кол-во">
+                        </div>
+                    </div>
+                    
+                    <div class="toggle-section" onclick="toggleSection(this, 'materials')">Материалы основания ▼</div>
+                    <div id="materials-${itemCount}" class="collapsible">
+                        <div class="form-group">
+                            <label>Основной материал</label>
+                            <div class="material-row">
+                                <select class="base-material">
+                                    <option value="">Тип материала</option>
+                                    ${BASE_MATERIALS.map(m => `
+                                        <option value="${m}" ${itemData?.baseMaterial === m ? 'selected' : ''}>${m}</option>
+                                    `).join('')}
+                                </select>
+                                <input type="text" class="base-brand" placeholder="Бренд" value="${itemData?.baseBrand || ''}">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Гидроизоляция</label>
+                            <div class="material-row">
+                                <input type="text" class="waterproofing-type" placeholder="Тип" value="${itemData?.waterproofingType || ''}">
+                                <input type="text" class="waterproofing-brand" placeholder="Бренд" value="${itemData?.waterproofingBrand || ''}">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Шпаклёвка</label>
+                            <div class="material-row">
+                                <input type="text" class="putty-type" placeholder="Тип" value="${itemData?.puttyType || ''}">
+                                <input type="text" class="putty-brand" placeholder="Бренд" value="${itemData?.puttyBrand || ''}">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Грунтовка</label>
+                            <div class="material-row">
+                                <input type="text" class="primer-type" placeholder="Тип" value="${itemData?.primerType || ''}">
+                                <input type="text" class="primer-brand" placeholder="Бренд" value="${itemData?.primerBrand || ''}">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Доп. информация</label>
+                            <textarea class="materials-notes">${itemData?.materialsNotes || ''}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="toggle-section" onclick="toggleSection(this, 'decor')">Параметры отделки ▼</div>
+                    <div id="decor-${itemCount}" class="collapsible">
+                        <div class="form-group">
+                            <label>Тип покрытия</label>
+                            <select class="decorative-type">
+                                <option value="">Выберите тип</option>
+                                ${DECORATIVE_TYPES.map(t => `
+                                    <option value="${t}" ${itemData?.decorativeType === t ? 'selected' : ''}>${t}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Свойства и толщина</label>
+                            <textarea class="decorative-props">${itemData?.decorativeProps || ''}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="toggle-section" onclick="toggleSection(this, 'defects')">Дефекты ▼</div>
+                    <div id="defects-${itemCount}" class="collapsible">
+                        <div class="form-group">
+                            <div class="defect-list" id="defects-list-${itemCount}"></div>
+                            <select class="defect-selector" onchange="addDefect(${itemCount})">
+                                <option value="">Добавить дефект</option>
+                                ${DEFECTS.map(d => `<option value="${d}">${d}</option>`).join('')}
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Доп. дефекты</label>
+                            <textarea class="additional-defects">${itemData?.additionalDefects || ''}</textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Примечания</label>
+                        <textarea class="notes">${itemData?.notes || ''}</textarea>
+                    </div>
+                    
+                    <button onclick="removeItem(${itemCount})" style="background:#ffebee;color:#c62828">Удалить</button>
+                </div>
+            `;
+            
+            container.appendChild(item);
+            
+            // Добавляем сохранённые дефекты
+            if (itemData?.defects) {
+                itemData.defects.forEach(defect => {
+                    addDefect(itemCount, defect);
+                });
+            }
+            
+            // Открываем первый раздел
+            document.getElementById(`materials-${itemCount}`).classList.add('active');
+        }
+
+        // Переключение секций
+        function toggleSection(button, section) {
+            const itemId = button.closest('.checklist-item').dataset.id;
+            const sectionEl = document.getElementById(`${section}-${itemId}`);
+            sectionEl.classList.toggle('active');
+            button.innerHTML = button.innerHTML.includes('▼') ? 
+                button.innerHTML.replace('▼', '▲') : 
+                button.innerHTML.replace('▲', '▼');
+        }
+
+        // Добавление дефекта
+        function addDefect(itemId, defectText = null) {
+            const container = document.getElementById(`defects-list-${itemId}`);
+            const selector = container.nextElementSibling;
+            
+            const defect = defectText || selector.value;
+            if (!defect) return;
+            
+            const tag = document.createElement('span');
+            tag.className = 'defect-tag';
+            tag.textContent = defect;
+            tag.onclick = () => tag.remove();
+            
+            container.appendChild(tag);
+            selector.value = '';
+        }
+
+        // Удаление элемента
+        function removeItem(itemId) {
+            const item = document.querySelector(`.checklist-item[data-id="${itemId}"]`);
+            if (item && confirm('Удалить эту запись?')) {
+                item.remove();
+                renumberItems();
+            }
+        }
+
+        // Перенумерация элементов
+        function renumberItems() {
+            const items = document.querySelectorAll('.checklist-item');
+            itemCount = items.length;
+            
+            items.forEach((item, index) => {
+                const num = index + 1;
+                item.dataset.id = num;
+                item.querySelector('.item-header span:first-child').textContent = `Поверхность #${num}`;
+                item.querySelector('.item-number').textContent = num;
+            });
+        }
+
+        // Сохранение чек-листа
+        function saveChecklist() {
+            const objectName = document.getElementById('objectName').value.trim();
+            if (!objectName) return alert("Введите название объекта");
+            
+            const items = [];
+            document.querySelectorAll('.checklist-item').forEach(itemEl => {
+                const itemId = itemEl.dataset.id;
+                
+                items.push({
+                    // Помещение и плоскость
+                    roomType: itemEl.querySelector('.room-type').value,
+                    planeType: itemEl.querySelector('.plane-type').value,
+                    planeCount: itemEl.querySelector('.small-input').value,
+                    
+                    // Материалы основания
+                    baseMaterial: itemEl.querySelector('.base-material').value,
+                    baseBrand: itemEl.querySelector('.base-brand').value,
+                    waterproofingType: itemEl.querySelector('.waterproofing-type').value,
+                    waterproofingBrand: itemEl.querySelector('.waterproofing-brand').value,
+                    puttyType: itemEl.querySelector('.putty-type').value,
+                    puttyBrand: itemEl.querySelector('.putty-brand').value,
+                    primerType: itemEl.querySelector('.primer-type').value,
+                    primerBrand: itemEl.querySelector('.primer-brand').value,
+                    materialsNotes: itemEl.querySelector('.materials-notes').value,
+                    
+                    // Декоративное покрытие
+                    decorativeType: itemEl.querySelector('.decorative-type').value,
+                    decorativeProps: itemEl.querySelector('.decorative-props').value,
+                    
+                    // Дефекты
+                    defects: Array.from(itemEl.querySelectorAll('.defect-tag')).map(tag => tag.textContent),
+                    additionalDefects: itemEl.querySelector('.additional-defects').value,
+                    
+                    // Примечания
+                    notes: itemEl.querySelector('.notes').value
+                });
+            });
+            
+            // Сохраняем в localStorage
+            localStorage.setItem(`checklist_${objectName}`, JSON.stringify({
+                name: objectName,
+                items: items
+            }));
+            
+            updateSavedLists();
+            alert(`Чек-лист "${objectName}" сохранён!`);
+        }
+
+        // Загрузка чек-листа
+        function loadChecklist(objectName = null) {
+            const name = objectName || document.getElementById('objectName').value.trim();
+            if (!name) return alert("Введите название объекта");
+            
+            const savedData = localStorage.getItem(`checklist_${name}`);
+            if (!savedData) return alert("Чек-лист не найден");
+            
+            const data = JSON.parse(savedData);
+            document.getElementById('objectName').value = data.name;
+            document.getElementById('checklistContainer').innerHTML = '';
+            itemCount = 0;
+            
+            data.items.forEach(item => {
+                addItem(item);
+            });
+        }
+
+        // Обновление списка сохранённых чек-листов
+        function updateSavedLists() {
+            const select = document.getElementById('savedLists');
+            select.innerHTML = '<option value="">-- Выберите --</option>';
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('checklist_')) {
+                    const option = document.createElement('option');
+                    option.value = key.replace('checklist_', '');
+                    option.textContent = option.value;
+                    select.appendChild(option);
+                }
+            }
+        }
+
+        // Загрузка выбранного чек-листа
+        function loadSelected() {
+            const selected = document.getElementById('savedLists').value;
+            if (selected) loadChecklist(selected);
+        }
+
+        // Инициализация при загрузке
+        window.onload = function() {
+            updateSavedLists();
+            addItem(); // Добавляем первый пустой элемент
+        };
+
+        // Закрытие/открытие по двойному тапу
+        document.addEventListener('dblclick', function(e) {
+            if (e.target.classList.contains('toggle-section')) {
+                toggleSection(e.target, e.target.getAttribute('onclick').match(/toggleSection\(this, '(\w+)'/)[1]);
+            }
+        });
+    </script>
+</body>
+</html>
